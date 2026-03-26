@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::token_source::ext_creds_source::ExternalCredentialSource;
-use crate::token_source::{BoxSource, Source, Token};
+use crate::token_source::{BoxSource, Source, SourceToken, Token};
 use async_trait::async_trait;
 use secret_vault_value::SecretValue;
 use tracing::debug;
@@ -121,14 +121,18 @@ pub enum ServiceAccountImpersonationSourceCredentials {
 
 #[async_trait]
 impl Source for Credentials {
-    async fn token(&self) -> crate::error::Result<Token> {
+    async fn token(&self) -> crate::error::Result<SourceToken> {
         match self {
-            Credentials::ServiceAccount(sa) => jwt::token(sa).await,
-            Credentials::User(user) => oauth2::token(user).await,
+            Credentials::ServiceAccount(sa) => jwt::token(sa).await.map(Into::into),
+            Credentials::User(user) => oauth2::token(user).await.map(Into::into),
             Credentials::ExternalAccount(external_account) => {
-                external_account::token(external_account).await
+                external_account::token(external_account)
+                    .await
+                    .map(Into::into)
             }
-            Credentials::ServiceAccountImpersonation(sa) => impersonate_account::token(sa).await,
+            Credentials::ServiceAccountImpersonation(sa) => {
+                impersonate_account::token(sa).await.map(Into::into)
+            }
         }
     }
 }

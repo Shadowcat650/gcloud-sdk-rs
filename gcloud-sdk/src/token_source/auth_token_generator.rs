@@ -8,7 +8,7 @@ use tracing::*;
 
 pub struct GoogleAuthTokenGenerator {
     token_source: BoxSource,
-    cached_token: Arc<RwLock<Option<Token>>>,
+    cached_token: Arc<RwLock<Option<Arc<Token>>>>,
 }
 
 impl GoogleAuthTokenGenerator {
@@ -29,8 +29,8 @@ impl GoogleAuthTokenGenerator {
         *write_state = None;
     }
 
-    pub async fn create_token(&self) -> crate::error::Result<Token> {
-        let existing_token: Option<Token> = {
+    pub async fn create_token(&self) -> crate::error::Result<Arc<Token>> {
+        let existing_token: Option<Arc<Token>> = {
             let read_state = self.cached_token.read().await;
             read_state.clone()
         };
@@ -49,7 +49,7 @@ impl GoogleAuthTokenGenerator {
                             updated_token.clone()
                         }
                         _ => {
-                            let new_token = self.token_source.token().await?;
+                            let new_token = self.token_source.token().await?.into_arc();
                             *write_token = Some(new_token.clone());
                             debug!(
                                 "Created a new Google OAuth token. Type: {}. Expiring: {}.",

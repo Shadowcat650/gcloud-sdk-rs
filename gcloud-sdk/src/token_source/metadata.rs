@@ -8,7 +8,7 @@ use std::str::FromStr;
 use tracing::*;
 
 use crate::token_source::gce::gce_metadata_client::GceMetadataClient;
-use crate::token_source::{BoxSource, Source, Token, TokenResponse};
+use crate::token_source::{BoxSource, Source, SourceToken, Token, TokenResponse};
 
 #[derive(Debug)]
 pub struct Metadata {
@@ -112,14 +112,14 @@ impl From<Metadata> for BoxSource {
 
 #[async_trait]
 impl Source for Metadata {
-    async fn token(&self) -> crate::error::Result<Token> {
+    async fn token(&self) -> crate::error::Result<SourceToken> {
         let url =
             PathAndQuery::from_str(format!("/computeMetadata/v1/{}", self.uri_suffix()).as_str())?;
         trace!("Receiving a new token from Metadata Server using '{}'", url);
 
         let resp_str = self.client.get(url).await?;
         let resp = TokenResponse::try_from(resp_str.as_str())?;
-        Token::try_from(resp)
+        Token::try_from(resp).map(Into::into)
     }
 }
 

@@ -1,11 +1,11 @@
+use async_trait::async_trait;
+use chrono::prelude::*;
+use secret_vault_value::SecretValue;
 use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::ops::Add;
 use std::path::PathBuf;
-
-use async_trait::async_trait;
-use chrono::prelude::*;
-use secret_vault_value::SecretValue;
+use std::sync::Arc;
 
 pub mod auth_token_generator;
 pub mod credentials;
@@ -22,9 +22,35 @@ mod gce;
 
 pub type BoxSource = Box<dyn Source + Send + Sync + 'static>;
 
+pub enum SourceToken {
+    Owned(Token),
+    Shared(Arc<Token>),
+}
+
+impl SourceToken {
+    pub fn into_arc(self) -> Arc<Token> {
+        match self {
+            SourceToken::Owned(t) => Arc::new(t),
+            SourceToken::Shared(t) => t,
+        }
+    }
+}
+
+impl From<Token> for SourceToken {
+    fn from(value: Token) -> Self {
+        Self::Owned(value)
+    }
+}
+
+impl From<Arc<Token>> for SourceToken {
+    fn from(value: Arc<Token>) -> Self {
+        Self::Shared(value)
+    }
+}
+
 #[async_trait]
 pub trait Source {
-    async fn token(&self) -> crate::error::Result<Token>;
+    async fn token(&self) -> crate::error::Result<SourceToken>;
 }
 
 pub async fn create_source(
@@ -98,7 +124,7 @@ impl Token {
     pub async fn generate_for_scopes(
         token_source_type: TokenSourceType,
         token_scopes: Vec<String>,
-    ) -> crate::error::Result<Token> {
+    ) -> crate::error::Result<SourceToken> {
         let token_source: BoxSource = create_source(token_source_type, token_scopes).await?;
         token_source.token().await
     }
@@ -142,7 +168,7 @@ impl TryFrom<&str> for TokenResponse {
 #[derive(Debug, Clone)]
 pub struct ExternalJwtFunctionSource<F, FN>
 where
-    F: std::future::Future<Output = crate::error::Result<Token>> + Send + Sync + 'static,
+    F: std::future::Future<Output = crate::error::Result<SourceToken>> + Send + Sync + 'static,
     FN: Fn() -> F + Send + Sync,
 {
     token_fn: FN,
@@ -150,7 +176,7 @@ where
 
 impl<F, FN> ExternalJwtFunctionSource<F, FN>
 where
-    F: std::future::Future<Output = crate::error::Result<Token>> + Send + Sync + 'static,
+    F: std::future::Future<Output = crate::error::Result<SourceToken>> + Send + Sync + 'static,
     FN: Fn() -> F + Send + Sync,
 {
     pub fn new(token_fn: FN) -> Self {
@@ -161,10 +187,10 @@ where
 #[async_trait]
 impl<F, FN> Source for ExternalJwtFunctionSource<F, FN>
 where
-    F: std::future::Future<Output = crate::error::Result<Token>> + Send + Sync,
+    F: std::future::Future<Output = crate::error::Result<SourceToken>> + Send + Sync,
     FN: Fn() -> F + Send + Sync,
 {
-    async fn token(&self) -> crate::error::Result<Token> {
+    async fn token(&self) -> crate::error::Result<SourceToken> {
         (self.token_fn)().await
     }
 }
