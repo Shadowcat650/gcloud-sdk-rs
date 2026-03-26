@@ -55,7 +55,7 @@ mod token_source;
 pub use token_source::auth_token_generator::GoogleAuthTokenGenerator;
 pub use token_source::metadata::Metadata as GceMetadataClient;
 pub use token_source::{
-    create_source, BoxSource, ExternalJwtFunctionSource, Source, Token, TokenSourceType,
+    create_source, BoxSource, ExternalJwtFunctionSource, Source, SourceToken, Token, TokenSourceType,
 };
 
 mod api_client;
