@@ -36,6 +36,15 @@ impl SourceToken {
     }
 }
 
+impl AsRef<Token> for SourceToken {
+    fn as_ref(&self) -> &Token {
+        match self {
+            Self::Owned(token) => token,
+            Self::Shared(token) => token.as_ref(),
+        }
+    }
+}
+
 impl From<Token> for SourceToken {
     fn from(value: Token) -> Self {
         Self::Owned(value)
